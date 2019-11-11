@@ -9,6 +9,7 @@ import random
 import time
 import pickle
 import threading
+import parse_img
 
 
 class cal_type():
@@ -71,10 +72,7 @@ async def hello(websocket, path):
                     print('>', greeting)
                     continue
 
-                img_data = base64.b64decode(src_data['data'])
-                file = open('output', 'wb')
-                file.write(img_data)
-                file.close()
+                parse_img.parse(src_data)
 
                 # Do Something...
                 cal_val = random.randint(0, 1600)
@@ -116,6 +114,7 @@ async def hello(websocket, path):
                     secret_key = f_id.read()
                     f_id.close()
                     code = src_data['code']
+                    print('code:', code)
                     get_txt = requests.get(
                         f'https://api.weixin.qq.com/sns/jscode2session?appid={app_id}&secret={secret_key}&js_code={code}&grant_type=authorization_code').text
                     received_json = json.loads(get_txt)
