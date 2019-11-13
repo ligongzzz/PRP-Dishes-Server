@@ -159,6 +159,8 @@ async def hello(websocket, path):
                             if item.t.tm_year == cur_time.tm_year and item.t.tm_mon == cur_time.tm_mon and item.t.tm_mday == cur_time.tm_mday:
                                 day_cal_val += item.val
                         return_data['day_cal'] = day_cal_val
+                        if len(return_list) > 15:
+                            return_list = return_list[-15:]
                         return_data['data'] = return_list
                     elif src_data['class'] == 'day':
                         return_data['type'] = 'day_cal'
