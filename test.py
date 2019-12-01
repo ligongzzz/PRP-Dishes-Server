@@ -72,7 +72,7 @@ async def hello(websocket, path):
                     print('>', greeting)
                     continue
 
-                parse_img.parse(src_data)
+                pred_data, return_img = parse_img.parse(src_data)
 
                 # Do Something...
                 cal_val = random.randint(0, 1600)
@@ -85,13 +85,14 @@ async def hello(websocket, path):
                     print(err)
                     print('写入数据库时发生错误！')
 
-                greeting = {'type': 'img', 'result': 1, 'data': [
-                    '西红柿炒蛋', '红烧肉', '青菜', '鸡腿'], 'cal_val': cal_val}
+                greeting = {'type': 'img', 'result': 1,
+                            'data': pred_data, 'cal_val': cal_val,
+                            'img': return_img}
 
                 greeting = json.dumps(greeting)
 
                 await websocket.send(greeting)
-                print(f"> {greeting}")
+                # print(f"> {greeting}")
 
                 # Send New Cal Message
                 return_data = {}
