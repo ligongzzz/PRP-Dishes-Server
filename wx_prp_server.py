@@ -35,13 +35,21 @@ class computer_type:
         print('Data sent to the computer.')
         raw_data = await self.websocket.recv()
         src_data = json.loads(raw_data)
-        src_
+        if src_data['type'] == 'process_result' and src_data['result'] == 'type':
+           return src_data['data'],src_data['cal_val'],src_data['return_img']
+        else:
+            raise Exception("Network Error.")
+        
 
 # A list to storage the users.
 user_list = {}
 
 # A queue to storage the available computation sources.
 computer_queue = queue.Queue()
+
+# A function to process the image with the computer.
+async def process_image(src_data):
+    computer_queue
 
 
 # A func to save user info.
@@ -108,7 +116,6 @@ async def hello(websocket, path):
                             'img': return_img}
 
                 greeting = json.dumps(greeting)
-
                 await websocket.send(greeting)
 
                 # Send New Cal Message
