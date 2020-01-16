@@ -10,6 +10,7 @@ import time
 import pickle
 import threading
 import parse_img
+import queue
 
 
 class cal_type():
@@ -24,7 +25,24 @@ class user_type():
         self.cal_list = []
 
 
+# A computer type to storage the basic computer info.
+class computer_type:
+    def __init__(self, websocket):
+        self.websocket = websocket
+
+    async def process_img(self, src_data):
+        await self.websocket.send(src_data)
+        print('Data sent to the computer.')
+        raw_data = await self.websocket.recv()
+        src_data = json.loads(raw_data)
+        src_
+
+# A list to storage the users.
 user_list = {}
+
+# A queue to storage the available computation sources.
+computer_queue = queue.Queue()
+
 
 # A func to save user info.
 
@@ -92,7 +110,6 @@ async def hello(websocket, path):
                 greeting = json.dumps(greeting)
 
                 await websocket.send(greeting)
-                # print(f"> {greeting}")
 
                 # Send New Cal Message
                 return_data = {}
@@ -179,6 +196,8 @@ async def hello(websocket, path):
                 except Exception as err:
                     print(err)
                     await websocket.send(json.dumps({'type': 'cal', 'result': 0}))
+            elif src_data['type'] == 'computer':
+                pass
         except Exception as err:
             print(err)
             break
