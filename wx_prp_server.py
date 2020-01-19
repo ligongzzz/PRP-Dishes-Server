@@ -29,33 +29,67 @@ class user_type():
 class computer_type:
     def __init__(self, websocket):
         self.websocket = websocket
+        self.cur_result = None
+        self.computer_status = True
 
     async def process_img(self, src_data):
-        await self.websocket.send(src_data)
+        # Clear the current result.
+
+        raw_data = json.dumps(src_data)
+        await self.websocket.send(raw_data)
         print('Data sent to the computer.')
-        raw_data = await self.websocket.recv()
-        src_data = json.loads(raw_data)
-        if src_data['type'] == 'process_result' and src_data['result'] == 'type':
-           return src_data['data'],src_data['cal_val'],src_data['return_img']
+
+        # While True receive the result from the computer.
+        while self.cur_result is None:
+            await asyncio.sleep(0.001)
+
+            # Check if the computer is down.
+            if not self.computer_status:
+                print('The computer service is down.')
+                raise Exception('Network Error.')
+
+        print('Received the result from the computer.')
+        src_data = self.cur_result
+        self.cur_result = None
+
+        if src_data['type'] == 'process_result' and src_data['result'] == 'success':
+            return src_data['data'], src_data['cal_val'], src_data['return_img']
         else:
+            print('Computer network error.')
             raise Exception("Network Error.")
-        
+
 
 # A list to storage the users.
 user_list = {}
 
 # A queue to storage the available computation sources.
-computer_queue = queue.Queue()
+computer_queue = []
 
-# A function to process the image with the computer.
+
 async def process_image(src_data):
-    computer_queue
-
-
-# A func to save user info.
+    '''
+    A function to process the image with the computer.
+    Return: pred_data, cal_val, return_img.
+    '''
+    # If the computer queue is empty, then just compute with CPU on this server :(
+    if len(computer_queue) == 0:
+        pred_data, return_img = parse_img.parse(src_data)
+        cal_val = random.randint(0, 1600)
+        return pred_data, cal_val, return_img
+    else:
+        # Get a computer from the computer queue.
+        cur_computer: computer_type = computer_queue[0]
+        computer_queue.remove(cur_computer)
+        pred_data, cal_val, return_img = await cur_computer.process_img(src_data)
+        # Put the computer into the queue.
+        computer_queue.append(cur_computer)
+        return pred_data, cal_val, return_img
 
 
 def save_user_info(seconds: int):
+    """
+    A function to save user info.
+    """
     while True:
         time.sleep(seconds)
         try:
@@ -75,20 +109,21 @@ try:
     user_list_pkl = f_i.read()
     f_i.close()
     user_list = pickle.loads(user_list_pkl)
-    print('加载用户数据成功！')
+    print('Successfully loaded user data!')
 except Exception as err:
     print(err)
-    print('加载用户数据失败！')
+    print('User data loading failed!')
 
 
-async def hello(websocket, path):
+async def main_service_loop(websocket, path):
     print('Received user.')
     # Set The User ID
     userID = None
+    cur_computer: computer_type = None
     while True:
         try:
             name = await websocket.recv()
-            print('<', len(name))
+            print('<', end=' ')
             src_data = json.loads(name)
             print(src_data['type'])
             if src_data['type'] == 'img':
@@ -98,10 +133,14 @@ async def hello(websocket, path):
                     print('>', greeting)
                     continue
 
-                pred_data, return_img = parse_img.parse(src_data)
+                # Process the images to get the answer.
+                try:
+                    pred_data, cal_val, return_img = await process_image(src_data)
+                except Exception as err:
+                    print('Error when processing the images.')
+                    await websocket.send(json.dumps({'type': 'img', 'result': 0}))
+                    continue
 
-                # Do Something...
-                cal_val = random.randint(0, 1600)
                 t = time.localtime(time.time())
 
                 try:
@@ -198,23 +237,35 @@ async def hello(websocket, path):
 
                     return_data = json.dumps(return_data)
                     await websocket.send(return_data)
-                    print('>', return_data)
+                    print('> cal data')
 
                 except Exception as err:
                     print(err)
                     await websocket.send(json.dumps({'type': 'cal', 'result': 0}))
             elif src_data['type'] == 'computer':
-                pass
+                cur_computer = computer_type(websocket)
+                computer_queue.append(cur_computer)
+                print('Received a new computer.')
+            elif src_data['type'] == 'process_result':
+                cur_computer.cur_result = src_data
         except Exception as err:
             print(err)
             break
+
+    # Remove the computer from the computer queue.
+    if cur_computer is not None:
+        cur_computer.computer_status = False
+        if cur_computer in computer_queue:
+            computer_queue.remove(cur_computer)
+        print('Removed the computer from the computer queue.')
+
     print('Connection closed.')
 
 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 ssl_context.load_cert_chain(certfile='./a.pem', keyfile='./a.key')
 
 start_server = websockets.serve(
-    hello, '0.0.0.0', 82, ssl=ssl_context, read_limit=2**25, max_size=2**25)
+    main_service_loop, '0.0.0.0', 82, ssl=ssl_context, read_limit=2**25, max_size=2**25)
 print('start service...')
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()

@@ -52,8 +52,7 @@ menu_list = open('menu.txt', 'rt').readlines()
 
 def parse_img(img_data):
     img_list = random_img_generator(img_data, 224, 5)
-
-    print('Start ResNet...')
+    print('Start recognition.')
     data = np.empty((5, 3, 224, 224))
 
     trans_to_tensor = transforms.ToTensor()
@@ -65,7 +64,6 @@ def parse_img(img_data):
 
     torch_data = torch.from_numpy(data).type(torch.FloatTensor)
     pred = torch.mean(resnet(torch_data), 0)
-    print(pred)
     pred = torch.max(pred, 0)[1].detach().numpy()
     print('Finish:', pred)
     return pred
@@ -85,7 +83,6 @@ def parse(src_data):
     ans_list = []
 
     for item in src_data['splitList']:
-        print(img.shape, item['x'], item['y'], item['w'], item['h'])
         img_sub = img[int(item['y']):int(item['y'] + item['h']),
                       int(item['x']):int(item['x'] + item['w'])]
         cv2.imwrite(f'./img/output{img_cnt}_{split_cnt}.png', img_sub)
