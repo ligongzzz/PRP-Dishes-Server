@@ -53,7 +53,7 @@ class computer_type:
         self.cur_result = None
 
         if src_data['type'] == 'process_result' and src_data['result'] == 'success':
-            return src_data['data'], src_data['cal_val'], src_data['return_img']
+            return src_data['data'], src_data['cal_val']
         else:
             print('Computer network error.')
             raise Exception("Network Error.")
@@ -69,21 +69,21 @@ computer_queue = []
 async def process_image(src_data):
     '''
     A function to process the image with the computer.
-    Return: pred_data, cal_val, return_img.
+    Return: pred_data, cal_val.
     '''
     # If the computer queue is empty, then just compute with CPU on this server :(
     if len(computer_queue) == 0:
-        pred_data, return_img = parse_img.parse(src_data)
+        pred_data = parse_img.parse(src_data)
         cal_val = random.randint(0, 1600)
-        return pred_data, cal_val, return_img
+        return pred_data, cal_val
     else:
         # Get a computer from the computer queue.
         cur_computer: computer_type = computer_queue[0]
         computer_queue.remove(cur_computer)
-        pred_data, cal_val, return_img = await cur_computer.process_img(src_data)
+        pred_data, cal_val = await cur_computer.process_img(src_data)
         # Put the computer into the queue.
         computer_queue.append(cur_computer)
-        return pred_data, cal_val, return_img
+        return pred_data, cal_val
 
 
 def save_user_info(seconds: int):
@@ -135,8 +135,9 @@ async def main_service_loop(websocket, path):
 
                 # Process the images to get the answer.
                 try:
-                    pred_data, cal_val, return_img = await process_image(src_data)
+                    pred_data, cal_val = await process_image(src_data)
                 except Exception as err:
+                    print(err)
                     print('Error when processing the images.')
                     await websocket.send(json.dumps({'type': 'img', 'result': 0}))
                     continue
@@ -151,8 +152,7 @@ async def main_service_loop(websocket, path):
                     print('写入数据库时发生错误！')
 
                 greeting = {'type': 'img', 'result': 1,
-                            'data': pred_data, 'cal_val': cal_val,
-                            'img': return_img}
+                            'data': pred_data, 'cal_val': cal_val}
 
                 greeting = json.dumps(greeting)
                 await websocket.send(greeting)
