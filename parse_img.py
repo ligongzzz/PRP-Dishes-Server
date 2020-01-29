@@ -9,6 +9,36 @@ import base64
 import torchvision.models as models
 import torchvision.transforms as transforms
 from model.unet_model import *
+import json
+
+
+class nutrient_type():
+    '''
+    A class to storage the nutrient information in a dish.
+    '''
+
+    def __init__(self, cal: float, fat: float, weight: float):
+        '''
+        cal:kcal/100g,fat:g/100g,weight:g
+        '''
+        self.cal = cal
+        self.fat = fat
+        self.weight = weight
+
+
+class dish_type():
+    '''
+    A class to storage the dish information.
+    '''
+
+    def __init__(self, name: str, nutrient_inform: nutrient_type):
+        '''
+        The cal,fat and weight are the real value in a dish. (After calculation.)
+        '''
+        self.name = name
+        self.cal = nutrient_inform.cal * nutrient_inform.weight / 100
+        self.fat = nutrient_inform.fat * nutrient_inform.weight / 100
+        self.cal = nutrient_inform.weight
 
 
 img_cnt = 0
@@ -28,6 +58,9 @@ print('Loaded the net successfully!')
 labels = [i.replace('\n', '') for i in open(
     './labels.txt', 'rt').readlines()]
 labels.remove(labels[0])
+
+# Load the nutrient values.
+nutrients = json.load('nutrient.json')
 
 
 def parse(src_data):
@@ -63,5 +96,8 @@ def parse(src_data):
             rate = torch.sum(pred_img == i).numpy() / IMG_SIZE ** 2
             if rate >= 0.03:
                 menu_list.append(labels[i])
+
+    # Add the img_cnt.
+    img_cnt += 1
 
     return menu_list

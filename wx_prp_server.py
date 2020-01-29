@@ -14,8 +14,9 @@ import queue
 
 
 class cal_type():
-    def __init__(self, value: int, t):
+    def __init__(self, value: float, fat: float, t):
         self.val = value
+        self.fat = fat
         self.t = t
 
 
