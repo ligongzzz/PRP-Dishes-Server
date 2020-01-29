@@ -13,6 +13,7 @@ import parse_img
 import queue
 
 
+# A cal type to storage the nutrient and time information for each request.
 class cal_type():
     def __init__(self, value: float, fat: float, t):
         self.val = value
@@ -20,6 +21,7 @@ class cal_type():
         self.t = t
 
 
+# A user type to storage the user information.
 class user_type():
     def __init__(self, userID):
         self.userID: str = userID
@@ -54,7 +56,7 @@ class computer_type:
         self.cur_result = None
 
         if src_data['type'] == 'process_result' and src_data['result'] == 'success':
-            return src_data['data'], src_data['cal_val']
+            return src_data['data']
         else:
             print('Computer network error.')
             raise Exception("Network Error.")
@@ -73,18 +75,24 @@ async def process_image(src_data):
     Return: pred_data, cal_val.
     '''
     # If the computer queue is empty, then just compute with CPU on this server :(
+    pred_data = None
     if len(computer_queue) == 0:
         pred_data = parse_img.parse(src_data)
         cal_val = random.randint(0, 1600)
-        return pred_data, cal_val
     else:
         # Get a computer from the computer queue.
         cur_computer: computer_type = computer_queue[0]
         computer_queue.remove(cur_computer)
-        pred_data, cal_val = await cur_computer.process_img(src_data)
+        pred_data = await cur_computer.process_img(src_data)
         # Put the computer into the queue.
         computer_queue.append(cur_computer)
-        return pred_data, cal_val
+
+    # Calculate cal_val.
+    cal_val = 0.0
+    for dish in pred_data:
+        cal_val += dish.cal
+
+    return pred_data, cal_val
 
 
 def save_user_info(seconds: int):
@@ -117,17 +125,24 @@ except Exception as err:
 
 
 async def main_service_loop(websocket, path):
+    '''
+    This is the main service loop that receive the data from the wechat miniprogram.
+    '''
     print('Received user.')
     # Set The User ID
     userID = None
     cur_computer: computer_type = None
     while True:
         try:
-            name = await websocket.recv()
+            # Recv
+            recv_json = await websocket.recv()
             print('<', end=' ')
-            src_data = json.loads(name)
+            src_data = json.loads(recv_json)
             print(src_data['type'])
+
+            # IMG data type.
             if src_data['type'] == 'img':
+                # Check if the userID does not exists.
                 if userID is None:
                     greeting = json.dumps({'type': "img", 'result': 0})
                     await websocket.send(greeting)
@@ -170,6 +185,8 @@ async def main_service_loop(websocket, path):
                 return_data = json.dumps(return_data)
                 await websocket.send(return_data)
                 print('>', return_data)
+
+            # Login type.
             elif src_data['type'] == 'login':
                 try:
                     f_id = open('appid.txt', 'rt')
@@ -201,6 +218,8 @@ async def main_service_loop(websocket, path):
                 except Exception as err:
                     print(err)
                     return_msg = {"type": "login", "result": 0}
+
+            # Cal type. Return the cal value.
             elif src_data['type'] == 'cal':
                 return_data = {}
                 try:
@@ -243,12 +262,18 @@ async def main_service_loop(websocket, path):
                 except Exception as err:
                     print(err)
                     await websocket.send(json.dumps({'type': 'cal', 'result': 0}))
+
+            # Receive the data from a computer.
             elif src_data['type'] == 'computer':
                 cur_computer = computer_type(websocket)
                 computer_queue.append(cur_computer)
                 print('Received a new computer.')
+
+            # Receive the process result from computer.
             elif src_data['type'] == 'process_result':
                 cur_computer.cur_result = src_data
+
+        # Catch the exception.
         except Exception as err:
             print(err)
             break
@@ -262,11 +287,13 @@ async def main_service_loop(websocket, path):
 
     print('Connection closed.')
 
+# Load the SSL Context.
 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 ssl_context.load_cert_chain(certfile='./a.pem', keyfile='./a.key')
 
+# Start the main service loop.
 start_server = websockets.serve(
     main_service_loop, '0.0.0.0', 82, ssl=ssl_context, read_limit=2**25, max_size=2**25)
-print('start service...')
+print('Start Service...')
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()
