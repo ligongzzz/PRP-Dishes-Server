@@ -72,7 +72,7 @@ computer_queue = []
 async def process_image(src_data):
     '''
     A function to process the image with the computer.
-    Return: pred_data, cal_val.
+    Return: pred_data, cal_type.
     '''
     # If the computer queue is empty, then just compute with CPU on this server :(
     pred_data = None
@@ -87,12 +87,14 @@ async def process_image(src_data):
         # Put the computer into the queue.
         computer_queue.append(cur_computer)
 
-    # Calculate cal_val.
+    # Calculate cal_val and fat_val.
     cal_val = 0.0
+    fat_val = 0.0
     for dish in pred_data:
         cal_val += dish.cal
+        fat_val += dish.fat
 
-    return pred_data, cal_val
+    return pred_data, cal_type(cal_val, fat_val, time.localtime(time.time()))
 
 
 def save_user_info(seconds: int):
@@ -111,8 +113,10 @@ def save_user_info(seconds: int):
             print('用户数据保存失败！')
 
 
+# Start the thread to save user info.
 threading.Thread(target=save_user_info, args=(20,)).start()
 
+# Load user data.
 try:
     f_i = open('user_data.dat', 'rb')
     user_list_pkl = f_i.read()
@@ -151,7 +155,7 @@ async def main_service_loop(websocket, path):
 
                 # Process the images to get the answer.
                 try:
-                    pred_data, cal_val = await process_image(src_data)
+                    pred_data, cal_ans = await process_image(src_data)
                 except Exception as err:
                     print(err)
                     print('Error when processing the images.')
@@ -161,14 +165,13 @@ async def main_service_loop(websocket, path):
                 t = time.localtime(time.time())
 
                 try:
-                    user_list[userID].cal_list.append(cal_type(cal_val, t))
-                    print('用户数据已经写入数据库！')
+                    user_list[userID].cal_list.append(cal_ans)
                 except Exception as err:
                     print(err)
                     print('写入数据库时发生错误！')
 
                 greeting = {'type': 'img', 'result': 1,
-                            'data': pred_data, 'cal_val': cal_val}
+                            'data': pred_data}
 
                 greeting = json.dumps(greeting)
                 await websocket.send(greeting)
@@ -223,6 +226,7 @@ async def main_service_loop(websocket, path):
             elif src_data['type'] == 'cal':
                 return_data = {}
                 try:
+                    # Return the list of nutrient data.
                     if src_data['class'] == 'normal':
                         return_data['type'] = 'cal'
                         return_data['result'] = 1
@@ -246,7 +250,27 @@ async def main_service_loop(websocket, path):
                         if len(return_list) > 15:
                             return_list = return_list[-15:]
                         return_data['data'] = return_list
+
+                    # Return the day nutrient data.
                     elif src_data['class'] == 'day':
+                        return_data['type'] = 'day_cal'
+                        cur_time = time.localtime(time.time())
+                        day_cal_val = 0
+                        for item in user_list[userID].cal_list:
+                            if item.t.tm_year == cur_time.tm_year and item.t.tm_mon == cur_time.tm_mon and item.t.tm_mday == cur_time.tm_mday:
+                                day_cal_val += item.val
+                        return_data['val'] = day_cal_val
+
+                    # Update cal data.
+                    elif src_data['class'] == 'update':
+                        try:
+                            user_list[userID].cal_list[-1].val = src_data['val']
+                            user_list[userID].cal_list[-1].fat = src_data['fat']
+                            print('User nutient data update success!')
+                        except Exception as err:
+                            print('User nutrient data update failed.')
+
+                        # Return the day cal.
                         return_data['type'] = 'day_cal'
                         cur_time = time.localtime(time.time())
                         day_cal_val = 0
