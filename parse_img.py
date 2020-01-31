@@ -24,7 +24,7 @@ class dish_type():
         self.name = name
         self.cal = nutrient_inform['cal'] * nutrient_inform['weight'] / 100
         self.fat = nutrient_inform['fat'] * nutrient_inform['weight'] / 100
-        self.cal = nutrient_inform['weight']
+        self.weight = nutrient_inform['weight']
 
 
 img_cnt = 0
@@ -32,7 +32,7 @@ img_cnt = 0
 # Hyper Parameters
 DEVICE = 'cpu'
 IMG_SIZE = 256
-OUT_FEATURES = 17
+OUT_FEATURES = 35
 
 # Load the net.
 net = UNet(3, OUT_FEATURES).to(DEVICE)
@@ -43,10 +43,11 @@ print('Loaded the net successfully!')
 # Load the labels.
 labels = [i.replace('\n', '') for i in open(
     './labels.txt', 'rt').readlines()]
-labels.remove(labels[0])
 
 # Load the nutrient values.
-nutrients = json.load('nutrient.json')
+nutrients = json.load(open('nutrient.json', 'rt'))
+
+print('Labels and nutrient info loaded.')
 
 
 def parse(src_data):
@@ -82,7 +83,7 @@ def parse(src_data):
             rate = torch.sum(pred_img == i).numpy() / IMG_SIZE ** 2
             if rate >= 0.03:
                 menu_list.append(
-                    dish_type(menu_list[i], nutrients[menu_list[i]]))
+                    dish_type(labels[i], nutrients[labels[i]]))
 
     # Add the img_cnt.
     img_cnt += 1

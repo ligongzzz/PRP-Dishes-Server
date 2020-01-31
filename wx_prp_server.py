@@ -170,6 +170,10 @@ async def main_service_loop(websocket, path):
                     print(err)
                     print('写入数据库时发生错误！')
 
+                # Convert dish type to object.
+                pred_data = [{'name': i.name, 'cal': i.cal,
+                              'fat': i.fat, 'weight': i.weight} for i in pred_data]
+
                 greeting = {'type': 'img', 'result': 1,
                             'data': pred_data}
 
@@ -232,6 +236,8 @@ async def main_service_loop(websocket, path):
                         return_data['result'] = 1
                         return_list = []
                         for item in user_list[userID].cal_list:
+                            if item.val == 0:
+                                continue
                             cur_item = {}
                             cur_item['val'] = item.val
                             cur_item['year'] = item.t.tm_year
