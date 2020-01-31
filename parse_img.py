@@ -32,7 +32,7 @@ img_cnt = 0
 # Hyper Parameters
 DEVICE = 'cpu'
 IMG_SIZE = 256
-OUT_FEATURES = 35
+OUT_FEATURES = 31
 
 # Load the net.
 net = UNet(3, OUT_FEATURES).to(DEVICE)
