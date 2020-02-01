@@ -81,7 +81,7 @@ def parse(src_data):
         menu_list = []
         for i in range(1, OUT_FEATURES):
             rate = torch.sum(pred_img == i).numpy() / IMG_SIZE ** 2
-            if rate >= 0.03:
+            if rate >= 0.02:
                 menu_list.append(
                     dish_type(labels[i], nutrients[labels[i]]))
 
